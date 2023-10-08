@@ -1,0 +1,10 @@
+CREATE FUNCTION [dbo].[GetWeekFirstDate]
+(@lastDate		DateTime,
+@firstDayOfWeek Int)
+RETURNS DATETIME
+AS
+BEGIN
+	SET @firstDayOfWeek=(@firstDayOfWeek-DATEPART(DW,@lastDate)+7*(-1))%7;
+	DECLARE @dateValue DateTime=DATEADD(DD,@firstDayOfWeek,@lastDate)
+	RETURN @dateValue
+END
