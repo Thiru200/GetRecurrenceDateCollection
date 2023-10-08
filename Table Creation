@@ -1,0 +1,22 @@
+
+CREATE TABLE [dbo].RecurrenceDateCollection 
+(
+RecurrenceID	INT PRIMARY KEY IDENTITY(1,1),
+RecurrenceDate	DateTime,
+CreatedDt		DateTime DEFAULT(GETDATE())
+)
+GO
+CREATE TYPE [dbo].RecurrenceRuleSeparator AS TABLE
+(
+RuleID				INT PRIMARY KEY IDENTITY(1,1),
+Expression		VARCHAR(200),
+CreatedDt		DateTime DEFAULT(GETDATE())
+)
+GO
+CREATE TYPE [dbo].RecurrenceRuleWeeklySeparator AS TABLE
+(
+RuleID				INT PRIMARY KEY IDENTITY(1,1),
+Expression			VARCHAR(200),
+CreatedDt			DateTime DEFAULT(GETDATE())
+)
+GO
