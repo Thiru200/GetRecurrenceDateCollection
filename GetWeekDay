@@ -1,0 +1,40 @@
+CREATE FUNCTION [dbo].[GetWeekDay]
+(@weekDay VARCHAR(100))
+RETURNS Int
+AS
+BEGIN
+	DECLARE @Result Int=0
+	IF(@weekDay='SU')
+	BEGIN
+		SET @Result=1;
+	END
+	ELSE IF(@weekDay='MO')
+	BEGIN
+		SET @Result=2;
+	END
+	ELSE IF(@weekDay='TU')
+	BEGIN
+		SET @Result=3;
+	END
+	ELSE IF(@weekDay='We')
+	BEGIN
+		SET @Result=4;
+	END
+	ELSE IF(@weekDay='TH')
+	BEGIN
+		SET @Result=5;
+	END
+	ELSE IF(@weekDay='FR')
+	BEGIN
+		SET @Result=6;
+	END
+	ELSE IF(@weekDay='SA')
+	BEGIN
+		SET @Result=7;
+	END
+	ELSE
+	BEGIN
+		SET @Result=8;
+	END
+	RETURN @Result
+END
