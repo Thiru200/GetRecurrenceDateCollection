@@ -1,0 +1,631 @@
+CREATE PROCEDURE [dbo].[GetOccurrenceDates]
+@RRule				Varchar(250),
+@SDate				DateTime,
+@OccurrenceCount	Int
+AS
+BEGIN
+	/* EXEC GetOccurrenceDates @RRule='FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;COUNT=10',@SDate='2023-10-08',@OccurrenceCount=15 */
+	
+	IF OBJECT_ID('RecurrenceDateCollection', 'U') IS NOT NULL TRUNCATE TABLE RecurrenceDateCollection
+	IF OBJECT_ID('RecurrenceRuleSeparator', 'U') IS NOT NULL TRUNCATE TABLE RecurrenceRuleSeparator
+	IF OBJECT_ID('RecurrenceRuleWeeklySeparator', 'U') IS NOT NULL TRUNCATE TABLE RecurrenceRuleWeeklySeparator
+
+	DECLARE @RecurrenceRuleSeparator AS RecurrenceRuleSeparator
+	DECLARE @RecurrenceRuleWeeklySeparator AS RecurrenceRuleWeeklySeparator
+
+	DECLARE @StartDate DateTime=@SDate
+	DECLARE @RuleArray VARCHAR(500)
+	--IF (CHARINDEX('DAILY',@RRule)>0)
+	--BEGIN
+		SET @RuleArray=(Select String_Agg (value,'|')  From string_split(@RRule,'='))
+		SET @RuleArray=(Select String_Agg (value,'|')  From string_split(@RuleArray,';'))
+		--Daily Rule
+		INSERT INTO @RecurrenceRuleSeparator (Expression)
+		Select (Select value From string_split(value,';')) From string_split(@RuleArray,'|')
+	--END
+	IF (CHARINDEX('WEEKLY',@RRule)>0)
+	BEGIN
+		--Weekly Rule
+		INSERT INTO @RecurrenceRuleWeeklySeparator (Expression)
+		Select value From string_split(@RRule,';')
+	END
+	DECLARE @RECCOUNT INT=0,@DAILY VARCHAR(50),@WEEKLY VARCHAR(50),@MONTHLY VARCHAR(50),@YEARLY VARCHAR(50), 
+	@BYSETPOS VARCHAR(50),@BYSETPOSCOUNT VARCHAR(50),@INTERVAL VARCHAR(50),@INTERVALCOUNT VARCHAR(50),
+	@COUNT VARCHAR(50),@BYDAY VARCHAR(50),@BYDAYVALUE VARCHAR(50),@BYMONTHDAY VARCHAR(50),@BYMONTHDAYCOUNT VARCHAR(50),
+	@BYMONTH VARCHAR(50),@BYMONTHCOUNT VARCHAR(50),@WEEKLYBYDAY VARCHAR(50),@UNTIL DateTime=NULL,@RecurrenceTblRowCount Int,@CounterVal Int=1,
+	@BYDAYPOSITION INT=0,@BYMONTHDAYPOSITION Int=0,@RecurrencewkRowCount Int=0,@WEEKLYBYDAYPOS Int=0,@addDate DATETIME,@ReccurrenceCount Int=0,@endDate DATETIME,@DyDayGap Int=0,
+	@statusValue Int=0,@IsUntilDateReached BIT=1,@WyWeekGap Int=0,@isweeklyselected BIT=1,@TblResult Int=0,@MyMonthGap Int=0,@monthDate Int=0,@currDate Int,@temp DATETIME,@YearVal Int=0,@MonthVal Int=0,
+	@tempDate DateTime,@weekCount Int,@monthStart DateTime,@weekStartDate DateTime,@monthStartWeekday Int,@nthweekDay Int,@nthWeek Int,@setPosCount Int
+
+
+	SET @RecurrenceTblRowCount=(Select Count(*) From @RecurrenceRuleSeparator)
+	WHILE(@CounterVal<=@RecurrenceTblRowCount)
+	BEGIN
+		--RECOUNT
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='COUNT')
+		BEGIN
+			SET @COUNT=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)
+			SET @RECCOUNT=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+		END
+
+		--UNTIL
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='UNTIL')
+		BEGIN
+			DECLARE @UntilVal Varchar(250)=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+			SET @UntilVal=(SELECT SUBSTRING(@UntilVal,1,4))
+			SET @UntilVal=@UntilVal+'-';
+			SET @UntilVal=@UntilVal+(SELECT SUBSTRING((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1)),5,2))
+			SET @UntilVal=@UntilVal+'-';
+			SET @UntilVal=@UntilVal+(SELECT SUBSTRING((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1)),7,6))
+			SET @UntilVal=@UntilVal+':';
+			SET @UntilVal=@UntilVal+(SELECT SUBSTRING((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1)),13,3))
+			SET @UntilVal=@UntilVal+':';
+			DECLARE @CharIndex INT=0
+			SET @CharIndex=(Select CHARINDEX('T',@UntilVal))
+			SET @UntilVal=SUBSTRING(@UntilVal,1,(@CharIndex-1))
+			DECLARE @InputDateTime DATETIME = CONVERT(DATETIME,@UntilVal);
+			SET @UNTIL=@InputDateTime;
+		END
+		
+		--DAILY
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='DAILY')
+		BEGIN
+			SET @DAILY=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)			
+		END
+
+		--WEEKLY
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='WEEKLY')
+		BEGIN
+			SET @WEEKLY=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)			
+		END
+
+		--INTERVAL
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='INTERVAL')
+		BEGIN
+			SET @INTERVAL=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)	
+			SET @INTERVALCOUNT=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+		END
+
+		--MONTHLY
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='MONTHLY')
+		BEGIN
+			SET @MONTHLY=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)			
+		END
+
+		--YEARLY
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='YEARLY')
+		BEGIN
+			SET @YEARLY=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)			
+		END
+
+		--BYSETPOS
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='BYSETPOS')
+		BEGIN
+			SET @BYSETPOS=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)	
+			SET @BYSETPOSCOUNT=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+		END
+
+		--BYDAY
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='BYDAY')
+		BEGIN
+			SET @BYDAYPOSITION=@CounterVal
+			SET @BYDAY=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)	
+			SET @BYDAYVALUE=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+		END
+
+		--BYMONTHDAY
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='BYMONTHDAY')
+		BEGIN
+			SET @BYMONTHDAYPOSITION=@CounterVal
+			SET @BYMONTHDAY=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)	
+			SET @BYMONTHDAYCOUNT=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+		END
+
+		--BYMONTH
+		IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='BYMONTH')
+		BEGIN
+			SET @BYMONTH=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)	
+			SET @BYMONTHCOUNT=(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+		END
+
+		SET @CounterVal=@CounterVal+1;
+	END
+
+	SET @RecurrencewkRowCount=(Select Count(*) From @RecurrenceRuleWeeklySeparator)
+
+	SET @CounterVal=1
+
+	WHILE(@CounterVal<=@RecurrencewkRowCount)
+	BEGIN
+		IF((Select Expression From @RecurrenceRuleWeeklySeparator where RuleID=@CounterVal)='BYDAY')
+		BEGIN
+			SET @WEEKLYBYDAY=(Select Expression From @RecurrenceRuleWeeklySeparator where RuleID=@CounterVal)
+			SET @WEEKLYBYDAYPOS=@CounterVal;
+			BREAK;
+		END
+		SET @CounterVal=@CounterVal+1;
+	END
+
+	IF(@RecurrenceTblRowCount<>0 AND @RRule<>'')
+	BEGIN
+		SET @CounterVal=1; 
+		SET @addDate=@StartDate
+		SET @ReccurrenceCount=@RECCOUNT
+		
+		WHILE(@CounterVal<=@RecurrenceTblRowCount)
+		BEGIN
+			IF((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=@CounterVal)='UNTIL')
+			BEGIN
+				SET @UntilVal =(Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1))
+				SET @UntilVal=(SELECT SUBSTRING(@UntilVal,1,4))
+				SET @UntilVal=@UntilVal+'-';
+				SET @UntilVal=@UntilVal+(SELECT SUBSTRING((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1)),5,2))
+				SET @UntilVal=@UntilVal+'-';
+				SET @UntilVal=@UntilVal+(SELECT SUBSTRING((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1)),7,6))
+				SET @UntilVal=@UntilVal+':';
+				SET @UntilVal=@UntilVal+(SELECT SUBSTRING((Select Expression FROM @RecurrenceRuleSeparator Where RuleID=(@CounterVal+1)),13,3))
+				SET @UntilVal=@UntilVal+':';
+				SET @CharIndex =0
+				SET @CharIndex=(Select CHARINDEX('T',@UntilVal))
+				SET @UntilVal=SUBSTRING(@UntilVal,1,(@CharIndex-1))	
+				SET @InputDateTime = CONVERT(DATETIME,@UntilVal);			
+				SET @endDate=@InputDateTime;
+			END
+			SET @CounterVal=@CounterVal+1;
+		END
+
+		IF(@DAILY='DAILY')
+		BEGIN
+			
+			IF((@RecurrenceTblRowCount>4 AND @INTERVAL='INTERVAL') OR @RecurrenceTblRowCount=4)
+			BEGIN				
+				IF(@RecurrenceTblRowCount=4)
+				BEGIN
+					SET @DyDayGap=1;
+				END
+
+				ELSE
+				BEGIN
+					SET @DyDayGap=@INTERVALCOUNT
+				END
+
+				IF(@ReccurrenceCount=0 AND @UNTIL=NULL)
+				BEGIN
+					SET @ReccurrenceCount=@OccurrenceCount;
+				END
+
+				IF(@ReccurrenceCount>0)
+				BEGIN
+					SET @CounterVal=1
+					WHILE(@CounterVal<=@ReccurrenceCount)
+					BEGIN
+						INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+						Select @addDate
+						SET @addDate=DATEADD(DD,@DyDayGap,@addDate)
+						SET @CounterVal=@CounterVal+1;
+					END
+				END
+
+				ELSE IF(@UNTIL IS NOT NULL)
+				BEGIN
+					WHILE(@IsUntilDateReached=1)
+					BEGIN			
+						IF(DATEDIFF(DD,@addDate,Convert(DATETIME,@UNTIL))>0)
+						BEGIN
+							INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+							Select @addDate
+							SET @addDate=DATEADD(DD,@DyDayGap,@addDate)
+						END
+						SET @statusValue=DATEDIFF(DD,@addDate,Convert(DATETIME,@UNTIL))
+						IF(@statusValue<=0)
+						BEGIN
+							SET @IsUntilDateReached=0;
+						END
+					END
+				END
+			END
+		END
+		--WEEKLY
+		ELSE IF(@WEEKLY='WEEKLY')
+		BEGIN		
+			SET @TblResult=(Select Count(*) FROM RecurrenceDateCollection)
+			IF(@RecurrenceTblRowCount>4 AND @INTERVAL='INTERVAL')
+			BEGIN
+				SET @WyWeekGap=@INTERVALCOUNT
+			END
+			ELSE
+			BEGIN
+				SET @WyWeekGap=1;
+			END
+
+			IF(LEN((Select Expression FROM @RecurrenceRuleWeeklySeparator Where RuleID=@WEEKLYBYDAYPOS))>6)
+			BEGIN
+				SET @isweeklyselected=1;
+			END
+
+			IF(@ReccurrenceCount=0 AND @UNTIL=NULL)
+			BEGIN
+				SET @ReccurrenceCount=@OccurrenceCount;
+			END
+
+			IF(@ReccurrenceCount>0)
+			BEGIN 
+				WHILE((Select Count(*) FROM RecurrenceDateCollection)<@ReccurrenceCount AND @isweeklyselected=1)
+				BEGIN
+					DECLARE @IncreamentDate Int
+					EXEC GetWeeklyDateCollection @addDate,@RecurrenceRuleWeeklySeparator
+					IF((DATENAME(w,@addDate))='Saturday')
+					BEGIN
+						SET @IncreamentDate =(((@WyWeekGap-1)*7)+1)
+						SET @addDate=DATEADD(DD,@IncreamentDate,@addDate)
+					END
+					ELSE
+					BEGIN
+						SET @addDate=DATEADD(DD,1,@addDate)
+					END
+				END	
+			END
+
+			ELSE IF (@UNTIL IS NOT NULL)
+			BEGIN
+				SET @IsUntilDateReached=1
+				WHILE(@IsUntilDateReached=1 AND @isweeklyselected=1)
+				BEGIN
+					EXEC GetWeeklyDateCollection @addDate,@RecurrenceRuleWeeklySeparator
+					IF((DATENAME(w,@addDate))='Saturday')
+					BEGIN
+						SET @IncreamentDate =(((@WyWeekGap-1)*7)+1)
+						SET @addDate=DATEADD(DD,@IncreamentDate,@addDate)
+					END
+					ELSE
+					BEGIN
+						SET @addDate=DATEADD(DD,1,@addDate)
+					END
+					SET @statusValue=DATEDIFF(DD,@addDate,Convert(DATETIME,@UNTIL))
+					IF(@statusValue<=0)
+					BEGIN
+						SET @IsUntilDateReached=0;
+					END
+				END
+			END
+		END
+		ELSE IF(@MONTHLY='MONTHLY')
+		BEGIN
+			IF(@RecurrenceTblRowCount>4 AND @INTERVAL='INTERVAL')
+			BEGIN
+				SET @MyMonthGap=@INTERVALCOUNT;
+			END
+			ELSE
+			BEGIN
+				SET @MyMonthGap=1;
+			END
+			IF(@BYMONTHDAY='BYMONTHDAY')
+			BEGIN
+				SET @monthDate=@BYMONTHDAYCOUNT;
+				IF(@monthDate<30)
+				BEGIN
+					SET @currDate=DAY(@startDate);
+					SET @YearVal=YEAR(@addDate);
+					SET @MonthVal=Month(@addDate);
+					--DECLARE @TDate VARCHAR(100)=(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDate))
+					SET @temp=(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDate));
+					IF(@monthDate<@currDate)
+					BEGIN
+						SET @addDate=DATEADD(MM,1,@temp);
+					END
+					ELSE 
+					BEGIN
+						SET @addDate=@temp;
+					END
+
+					IF(@ReccurrenceCount=0 AND @UNTIL IS NULL)
+					BEGIN
+						SET @ReccurrenceCount=@ReccurrenceCount;
+					END
+
+					IF(@ReccurrenceCount>0)
+					BEGIN
+						SET @CounterVal=1;
+						WHILE(@CounterVal<@ReccurrenceCount)
+						BEGIN
+							IF(Month(@addDate)=2 AND @monthDate>28)
+							BEGIN
+								SET @YearVal=YEAR(@addDate);
+								SET @MonthVal=MONTH(@addDate);
+								SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDate)));
+								DECLARE @DateVal Int=DAY(EOMONTH(@tempDate));
+								SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+								SET @addDate=@tempDate;
+								SET @addDate=DATEADD(MM,@MyMonthGap,@addDate);
+								SET @DateVal =DAY(@monthDate)
+								SET @addDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+							END
+							ELSE
+							BEGIN
+								INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+								Select @addDate
+								SET @addDate=DATEADD(MM,@MyMonthGap,@addDate);
+							END
+							SET @CounterVal=@CounterVal+1;
+						END				
+					END
+					ELSE IF(@UNTIL IS NOT NULL)
+					BEGIN
+						SET @IsUntilDateReached=1;
+						WHILE(@IsUntilDateReached=1)
+						BEGIN
+							IF(Month(@addDate)=2 AND @monthDate>28)
+							BEGIN
+								SET @YearVal=YEAR(@addDate);
+								SET @MonthVal=MONTH(@addDate);
+								SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDate)));
+								Set @DateVal =DAY(EOMONTH(@tempDate));
+								SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+								SET @addDate=@tempDate;
+								SET @addDate=DATEADD(MM,@MyMonthGap,@addDate);
+								SET @DateVal =DAY(@monthDate)
+								SET @addDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+							END
+							ELSE
+							BEGIN
+								INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+								Select @addDate
+								SET @addDate=DATEADD(MM,@MyMonthGap,@addDate);
+							END
+							IF(DATEDIFF(DD,@addDate,@UNTIL)>0)
+							BEGIN
+								SET @IsUntilDateReached=0;
+							END
+						END
+					END
+				END
+				ELSE
+				BEGIN
+						IF(@ReccurrenceCount=0 AND @UNTIL IS NULL)
+						BEGIN
+							SET @ReccurrenceCount=@OccurrenceCount;
+						END
+
+						IF(@ReccurrenceCount>0)
+						BEGIN
+							SET @CounterVal=1;
+							WHILE(@CounterVal<=@ReccurrenceCount)
+							BEGIN
+								IF(DAY(@addDate)=DAY(@StartDate))
+								BEGIN
+									Insert Into RecurrenceDateCollection(RecurrenceDate)
+									Select @addDate
+									SET @CounterVal=@CounterVal+1;
+								END
+								ELSE
+								BEGIN
+									SET @CounterVal=@CounterVal-1;
+								END
+								SET @addDate=DATEADD(MM,@MyMonthGap,@addDate);
+								SET @YearVal=YEAR(@addDate);
+								SET @MonthVal=MONTH(@addDate);
+								SET @DateVal =01;
+								SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+								SET @addDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,DAY(EOMONTH(@tempDate)))));				
+							END
+						END
+						ELSE IF(@UNTIL IS NOT NULL)
+						BEGIN
+							SET @IsUntilDateReached=1;
+							WHILE(@IsUntilDateReached=1)
+							BEGIN
+								IF(DAY(@addDate)=DAY(@StartDate))
+								BEGIN
+									Insert Into RecurrenceDateCollection(RecurrenceDate)
+									Select @addDate
+								END
+								SET @addDate=DATEADD(MM,@MyMonthGap,@addDate);
+								SET @YearVal=YEAR(@addDate);
+								SET @MonthVal=MONTH(@addDate);
+								SET @DateVal =01;
+								SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+								SET @addDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,DAY(EOMONTH(@tempDate)))));				
+								IF(DATEDIFF(DD,@addDate,@UNTIL)>0)
+								BEGIN
+									SET @IsUntilDateReached=0;
+								END
+							END
+						END
+				END
+			END
+			ELSE IF(@BYDAY='BYDAY')
+			BEGIN
+				IF(@ReccurrenceCount=0 AND @UNTIL IS NULL)
+				BEGIN
+					SET @ReccurrenceCount=@OccurrenceCount;
+				END
+				IF(@ReccurrenceCount>0)
+				BEGIN
+					WHILE((Select COUNT(*) FROM RecurrenceDateCollection)<@ReccurrenceCount)
+					BEGIN
+						SET @YearVal=YEAR(@addDate);
+						SET @MonthVal=MONTH(@addDate);
+						SET @DateVal =01;
+						SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+								
+						DECLARE @daysInMonth		Int=DAY(EOMONTH(@tempDate))
+						DECLARE @firstOfMonth		DateTime=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));	
+						DECLARE @firstDayOfMonth	Int=DATEPART(dw,@firstOfMonth);
+						DECLARE @weeksInMonth		INT=((@firstDayOfMonth+@daysInMonth)/7);
+						SET @weekCount=@weeksInMonth;
+
+						SET @YearVal=YEAR(@addDate);
+						SET @MonthVal=MONTH(@addDate);
+						SET @DateVal =01;
+						SET @monthStart=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+						SET @weekStartDate=DATEADD(DD,-(Select DATEPART(dw,@monthStart)),@monthDate);
+						SET @monthStartWeekday=DATEPART(dw,@monthStart);
+						SET @nthweekDay=(Select [dbo].GetWeekDay(@BYDAYVALUE)-1);
+						SET @setPosCount=@BYSETPOSCOUNT;
+
+						IF(@monthStartWeekday<=@nthweekDay)
+						BEGIN
+							IF(@setPosCount<1)
+							BEGIN
+								SET @BYSETPOS=@weekCount+@setPosCount;
+							END
+							ELSE
+							BEGIN
+								SET @BYSETPOS=@setPosCount;
+							END
+							IF(@setPosCount<0)
+							BEGIN
+								SET @nthWeek=@BYSETPOS;
+							END
+							ELSE
+							BEGIN
+								SET @nthWeek=@BYSETPOS-1;
+							END
+						END
+						ELSE
+						BEGIN
+							IF(@setPosCount<0)
+							BEGIN
+								SET @BYSETPOS=@weekCount+@setPosCount;
+							END
+							ELSE
+							BEGIN
+								SET @BYSETPOS=@setPosCount;
+							END
+							SET @nthWeek=@BYSETPOS;
+						END
+						SET @addDate=DATEADD(DD,(@nthWeek*7),@weekStartDate)
+						SET @addDate=DATEADD(DD,@nthweekDay,@addDate);
+
+						IF((Select DATEDIFF(DD,@addDate,@StartDate))>0)
+						BEGIN
+							SET @addDate=DATEADD(MM,1,@addDate);
+						END
+
+						IF(@weekCount=6 AND DAY(@addDate)=23)
+						BEGIN
+							DECLARE @flag BIT=1
+							IF(Month(@addDate)=2)
+							BEGIN
+								SET @flag=0;
+							END
+
+							IF(@flag=1)
+							BEGIN
+								Insert Into RecurrenceDateCollection(RecurrenceDate)
+								Select @addDate
+							END
+							SET @addDate=DATEADD(DD,@MyMonthGap,@addDate);
+						END
+
+						ELSE IF(@weekCount=6 AND DAY(@addDate)=24)
+						BEGIN
+							DECLARE @Days Int=DAY(EOMONTH(@addDate));
+							SET @flag =1
+							IF(DAY((DATEADD(DD,7,@addDate)))<>@Days)
+							BEGIN
+								SET @flag=0;
+							END
+							IF(@flag=1)
+							BEGIN
+								SET @addDate=DATEADD(DD,7,@addDate)
+								Insert Into RecurrenceDateCollection(RecurrenceDate)
+								Select @addDate
+							END
+							SET @addDate=DATEADD(MONTH,@MyMonthGap,@addDate)
+						END
+
+						ELSE IF(DAY(@addDate)<>23 AND @BYSETPOSCOUNT<>-1)
+						BEGIN
+							Insert Into RecurrenceDateCollection(RecurrenceDate)
+							Select @addDate
+							SET @addDate=DATEADD(Month,@MyMonthGap,@addDate)
+						END
+					END
+				END
+				ELSE IF (@UNTIL IS NOT NULL)
+				BEGIN
+					WHILE(@addDate<=@endDate)
+					BEGIN
+						IF(@addDate>@endDate)
+						BEGIN
+							BREAK;
+						END
+						SET @YearVal=YEAR(@addDate);
+						SET @MonthVal=MONTH(@addDate);
+						SET @DateVal =01;
+						SET @monthStart=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+						SET @weekStartDate=DATEADD(DD,-DATEPART(dw,@monthStart),@monthStart);
+						SET @monthStartWeekday=DATEPART(Dw,@monthStart);
+						SET @nthweekDay=(Select [dbo].GetWeekDay(@BYDAYVALUE)-1);
+						SET @nthWeek=0
+				
+						IF(@monthStartWeekday<=@nthweekDay)
+						BEGIN
+							SET @nthWeek=(CAST(@BYSETPOSCOUNT as INT)-1);
+						END
+						ELSE
+						BEGIN
+							SET @nthWeek=CAST(@BYSETPOSCOUNT as INT)
+						END
+
+						IF(CAST(@BYSETPOSCOUNT as INT)=-1)
+						BEGIN
+							DECLARE @lastDate DATETIME=EOMONTH(DATEADD(DD,-1,DATEADD(MM,1,@monthStart)));
+							SET @addDate=(Select [dbo].GetWeekFirstDate(@lastDate,@nthweekDay));
+						END
+					
+						ELSE
+						BEGIN
+							SET @addDate=DATEADD(DD,(@nthWeek*7),@weekStartDate)
+							SET @addDate=DATEADD(DD,@nthweekDay,@addDate);
+							IF(@addDate>=@endDate)
+							BEGIN
+								BREAK;
+							END
+						END
+
+						IF(DATEDIFF(DD,@addDate,@StartDate)>0)
+						BEGIN
+							Set @addDate=DATEADD(MONTH,1,@addDate);
+						END
+
+						INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+						Select @addDate
+
+						IF(Cast(@BYSETPOSCOUNT as Int)=-1)
+						BEGIN
+							SET @YearVal=YEAR(@addDate);
+							SET @MonthVal=MONTH(@addDate);
+							SET @DateVal =01;
+							SET @addDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal)));
+						END
+						ELSE
+						BEGIN
+							SET @addDate=DATEADD(MONTH,@MyMonthGap,@addDate);
+							SET @addDate=DATEADD(DD,-(DAY(@addDate)-1),@addDate)
+						END
+				  END
+			   END
+			
+			END
+		END
+	--Final Result
+	IF(@OccurrenceCount>0)
+	BEGIN
+		SELECT 
+			RecurrenceID,Convert(Date,RecurrenceDate)RecurrenceDate 
+		FROM 
+			RecurrenceDateCollection  
+		Where 
+			RecurrenceID<=@OccurrenceCount
+	END
+	ELSE
+	BEGIN
+		SELECT 
+			RecurrenceID,Convert(Date,RecurrenceDate)RecurrenceDate 
+		FROM 
+			RecurrenceDateCollection
+	END
+END
+END
