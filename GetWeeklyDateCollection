@@ -1,0 +1,46 @@
+ALTER PROCEDURE [dbo].[GetWeeklyDateCollection]  
+(  
+@addDate Datetime,  
+@RecurrenceRuleSeparator dbo.RecurrenceRuleWeeklySeparator READONLY  
+)  
+AS  
+BEGIN  
+		DECLARE @RowIndex Int=(Select RULEID FROM  @RecurrenceRuleSeparator WHERE Expression like 'BYDAY%')  
+  
+	 IF((Select CHARINDEX('SU',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Sunday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate      
+	 END  
+	 ELSE IF((Select CHARINDEX('MO',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Monday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('TU',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Tuesday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('WE',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Wednesday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('TH',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Thursday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('FR',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Friday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('SA',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@RowIndex)>0 AND DATENAME(w,@addDate)='Saturday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END
+ 
+END
