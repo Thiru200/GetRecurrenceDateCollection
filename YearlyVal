@@ -1,0 +1,87 @@
+ELSE IF(@YEARLY='YEARLY')
+		BEGIN
+			DECLARE @YyYearGap Int=0
+			IF((Select COUNT(*) FROM RecurrenceDateCollection)>4 AND @INTERVAL='INTERVAL')
+			BEGIN
+				SET @YyYearGap=CAST(@INTERVALCOUNT AS INT)
+			END
+			ELSE
+				SET @YyYearGap=1;
+			END
+			IF(@BYMONTHDAY='BYMONTHDAY')
+			BEGIN
+				DECLARE @monthIndex Int=CAST(@BYMONTHCOUNT AS INT);
+				DECLARE @dayIndex INT=CAST(@BYMONTHDAYCOUNT AS INT);
+				IF(@monthIndex>0 AND @monthIndex<=12)
+				BEGIN
+					SET @YearVal=YEAR(@addDate);
+					SET @MonthVal=MONTH(@addDate);
+					SET @tempDate=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDate)))
+					DECLARE @bound Int=DAY(EOMONTH(@tempDate))
+					IF(@bound>=@dayIndex)
+					BEGIN
+						SET @YearVal=YEAR(@addDate);
+						SET @MonthVal=MONTH(@addDate);
+						DECLARE @specificDate DATETIME=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@dayIndex)))
+						IF(DAY(@specificDate)<DAY(@addDate))
+						BEGIN
+							SET @addDate=@specificDate;
+							SET @addDate=DATEADD(YEAR,@addDate,1);
+						END
+						ELSE
+						BEGIN
+							SET @addDate=@specificDate;
+						END
+
+						IF(@ReccurrenceCount=0 AND @UNTIL IS NULL)
+						BEGIN
+							SET @ReccurrenceCount=@OccurrenceCount;
+						END
+
+						IF(@ReccurrenceCount>0)
+						BEGIN
+							SET @CounterVal=1;
+							WHILE(@CounterVal<=@ReccurrenceCount)
+							BEGIN
+								INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+								Select @addDate
+								SET @addDate=DATEADD(YEAR,@YyYearGap,@addDate);
+								SET @CounterVal=@CounterVal+1;
+							END
+						END
+
+						ELSE IF(@UNTIL IS NOT NULL)
+						BEGIN
+							SET @IsUntilDateReached=1;
+							WHILE(@IsUntilDateReached=1)
+							BEGIN
+								INSERT INTO RecurrenceDateCollection(RecurrenceDate)
+								Select @addDate
+								SET @addDate=DATEADD(YEAR,@YyYearGap,@addDate);
+								IF(DATEDIFF(DD,@addDate,@UNTIL)>0)
+								BEGIN
+									SET @IsUntilDateReached=0;
+								END
+							END
+						END
+					END
+				END
+			END
+			ELSE IF(@BYDAY='BYDAY')
+			BEGIN
+				SET @monthIndex =CAST(@BYMONTHCOUNT AS INT);
+				
+				IF(@ReccurrenceCount=0 AND @UNTIL IS NULL)
+				BEGIN
+					SET @ReccurrenceCount=@OccurrenceCount
+				END
+
+				IF(@ReccurrenceCount>0)
+				BEGIN
+					WHILE((Select COUNT(*) From RecurrenceDateCollection)<@ReccurrenceCount)
+					BEGIN
+
+					END
+				END
+			END
+		END
