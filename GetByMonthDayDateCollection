@@ -1,0 +1,26 @@
+ALTER PROCEDURE [dbo].[GetByMonthDayDateCollection]
+(@addDateVal DateTime,@monthDateVal Int,@MyMonthGapVal Int)
+AS
+BEGIN
+	DECLARE @ReturnDate DateTime
+		IF(Month(@addDateVal)=2 AND @monthDateVal>28)
+		BEGIN
+			DECLARE @YearVal INT=YEAR(@addDateVal);
+			DECLARE @MonthVal INT=MONTH(@addDateVal);
+			DECLARE @TDate DATETIME=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+'02'+'-'+'01'));
+			DECLARE @MonthDays Int=DAY(EOMONTH(@TDate));
+			SET @addDateVal =CONVERT(DATETIME,CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@Monthval)+'-'+CONVERT(VARCHAR,@MonthDays));
+			--DECLARE @tempDate DATETIME=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,EOMONTH(@DaysInMonth))));
+			SET @addDateVal =DATEADD(DD,@MyMonthGapVal,@addDateVal);
+			SET @YearVal=YEAR(@addDateVal);
+			SET @MonthVal=MONTH(@addDateVal);
+			SET @addDateVal=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDateVal)));			
+	  END
+	  ELSE
+	  BEGIN
+			Insert Into RecurrenceDateCollection(RecurrenceDate) 
+			Select @addDateVal
+			SET @addDateVal=DATEADD(MM,@MyMonthGapVal,@addDateVal);
+	  END
+	  Select @addDateVal [addDate]
+END
