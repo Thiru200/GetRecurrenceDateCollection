@@ -1,26 +1,52 @@
-ALTER PROCEDURE [dbo].[GetByMonthDayDateCollection]
-(@addDateVal DateTime,@monthDateVal Int,@MyMonthGapVal Int)
-AS
-BEGIN
-	DECLARE @ReturnDate DateTime
-		IF(Month(@addDateVal)=2 AND @monthDateVal>28)
-		BEGIN
-			DECLARE @YearVal INT=YEAR(@addDateVal);
-			DECLARE @MonthVal INT=MONTH(@addDateVal);
-			DECLARE @TDate DATETIME=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+'02'+'-'+'01'));
-			DECLARE @MonthDays Int=DAY(EOMONTH(@TDate));
-			SET @addDateVal =CONVERT(DATETIME,CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@Monthval)+'-'+CONVERT(VARCHAR,@MonthDays));
-			--DECLARE @tempDate DATETIME=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,EOMONTH(@DaysInMonth))));
-			SET @addDateVal =DATEADD(DD,@MyMonthGapVal,@addDateVal);
-			SET @YearVal=YEAR(@addDateVal);
-			SET @MonthVal=MONTH(@addDateVal);
-			SET @addDateVal=CONVERT(DATETIME,(CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@monthDateVal)));			
-	  END
-	  ELSE
-	  BEGIN
-			Insert Into RecurrenceDateCollection(RecurrenceDate) 
-			Select @addDateVal
-			SET @addDateVal=DATEADD(MM,@MyMonthGapVal,@addDateVal);
-	  END
-	  Select @addDateVal [addDate]
+ALTER PROCEDURE [dbo].[GetWeeklyDateCollection]  
+(  
+@addDate Datetime,  
+@WEEKLYBYDAYPOS Int,
+@RecurrenceRuleSeparator dbo.RecurrenceRuleWeeklySeparator READONLY  
+)  
+AS  
+BEGIN  
+	IF(@WEEKLYBYDAYPOS=1)
+	BEGIN
+		SET @WEEKLYBYDAYPOS=1;
+	END
+
+	 IF((Select CHARINDEX('SU',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Sunday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate      
+	 END  
+	 ELSE IF((Select CHARINDEX('MO',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Monday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('TU',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Tuesday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('WE',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Wednesday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('TH',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Thursday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('FR',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Friday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END  
+	 ELSE IF((Select CHARINDEX('SA',Expression) FROM @RecurrenceRuleSeparator Where RuleID=@WEEKLYBYDAYPOS)>0 AND DATENAME(w,@addDate)='Saturday')  
+	 BEGIN  
+		INSERT INTO RecurrenceDateCollection(RecurrenceDate)  
+		Select @addDate  
+	 END
+ 
 END
+
+
