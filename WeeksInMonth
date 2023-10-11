@@ -2,7 +2,26 @@ CREATE FUNCTION [dbo].[WeeksInMonth]
 (@ActualDate Datetime)
 RETURNS Int
 AS
+BEGINCREATE FUNCTION [dbo].[WeeksInMonth]
+(@ActualDate Datetime)
+RETURNS Int
+AS
 BEGIN
+	
+	DECLARE @YearVal INT  = YEAR(@ActualDate);
+	DECLARE @MonthVal INT = MONTH(@ActualDate);
+	DECLARE @DateVal INT  = 01;
+	DECLARE @TDate VARCHAR(100)=CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal);
+	DECLARE @tempDate DATETIME=CONVERT(DATETIME,@TDate);
+	DECLARE @lastDateInMonth DateTime=EOMONTH(@tempDate);
+	DECLARE @daysInMonth		Int=DAY(@lastDateInMonth)
+	SET @TDate=CONVERT(VARCHAR,@YearVal)+'-'+CONVERT(VARCHAR,@MonthVal)+'-'+CONVERT(VARCHAR,@DateVal);
+	DECLARE @firstOfMonth	DateTime=CONVERT(DATETIME,@TDate);
+	DECLARE @firstDayOfMonth	Int=DATEPART(dw,@firstOfMonth);
+	DECLARE @weeksInMonth		INT=CEILING((@firstDayOfMonth+@daysInMonth)/7.0);
+	RETURN @weeksInMonth
+
+END
 	
 	DECLARE @YearVal INT  = YEAR(@ActualDate);
 	DECLARE @MonthVal INT = MONTH(@ActualDate);
